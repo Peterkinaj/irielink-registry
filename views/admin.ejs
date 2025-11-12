@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IrieLink Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-black text-white min-h-screen flex flex-col font-[Inter]">
+
+<header class="w-full border-b border-neutral-800 px-6 py-4 flex justify-between items-center bg-black/60 backdrop-blur-md sticky top-0 z-50">
+  <h1 class="text-lg md:text-xl font-semibold tracking-wide text-white">IrieLink Registry 🌿</h1>
+  <nav class="space-x-4 text-gray-300 text-sm md:text-base">
+    <a href="/" class="hover:text-white transition">Home</a>
+    <a href="/full-list" class="hover:text-white transition">Full List</a>
+    <a href="/contact" class="hover:text-white transition">Contact</a>
+  </nav>
+</header>
+
+
+  <% if (page === 'login') { %>
+  <!-- 🔐 ADMIN LOGIN PAGE -->
+  <main class="flex-1 flex items-center justify-center">
+    <div class="bg-neutral-900 p-8 rounded-2xl shadow-xl w-full max-w-sm text-center">
+      <h1 class="text-2xl font-semibold mb-6">Admin Login</h1>
+
+      <% if (typeof error !== 'undefined' && error) { %>
+        <p class="text-red-500 mb-4"><%= error %></p>
+      <% } %>
+
+      <form method="POST" action="/admin/login" class="space-y-4">
+        <input
+          name="password"
+          type="password"
+          placeholder="Admin password"
+          class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white placeholder-gray-400"
+          required
+        />
+        <button
+          class="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-2 font-semibold"
+        >
+          Login
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <% } else { %>
+
+  <!-- 🖥️ ADMIN DASHBOARD -->
+  <header class="border-b border-neutral-800 py-6 text-center">
+    <h1 class="text-3xl font-bold tracking-tight">IrieLink Registry Admin</h1>
+    <p class="text-gray-400 text-sm mt-1">Add or edit wishlist items</p>
+  </header>
+
+  <main class="flex-1 container mx-auto px-6 py-10 space-y-12">
+
+    <!-- ✏️ ADD / EDIT FORM -->
+    <section id="form-section" class="bg-neutral-900 p-6 rounded-2xl shadow-lg">
+      <h2 class="text-xl font-semibold mb-4" id="form-title">Add New Wishlist Item</h2>
+
+      <form id="item-form" method="POST" action="/admin/items" class="grid gap-4 md:grid-cols-2">
+        <input type="hidden" name="id" id="item-id" value="">
+
+        <!-- Item Name -->
+        <div class="flex flex-col gap-2">
+          <label class="text-sm text-gray-400">Item Name</label>
+          <input
+            name="name"
+            id="name"
+            class="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white"
+            required
+          />
+        </div>
+
+        <!-- Price -->
+        <div class="flex flex-col gap-2">
+          <label class="text-sm text-gray-400">Price ($)</label>
+          <input
+            name="price_dollars"
+            id="price_dollars"
+            type="number"
+            step="0.01"
+            placeholder="e.g., 49.99"
+            class="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white placeholder-gray-400"
+          />
+        </div>
+
+        <!-- Description -->
+        <div class="md:col-span-2 flex flex-col gap-2">
+          <label class="text-sm text-gray-400">Description</label>
+          <textarea
+            name="description"
+            id="description"
+            rows="3"
+            class="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white"
+          ></textarea>
+        </div>
+
+        <!-- Image -->
+        <div class="flex flex-col gap-2">
+          <label class="text-sm text-gray-400">Image URL</label>
+          <input
+            name="image_url"
+            id="image_url"
+            placeholder="Paste image link or /images/filename.jpg"
+            class="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white"
+          />
+          <img id="image_preview" class="mt-2 w-full h-40 object-cover rounded-lg hidden" />
+        </div>
+
+        <!-- Purchase Link -->
+        <div class="flex flex-col gap-2">
+          <label class="text-sm text-gray-400">Purchase Link (Registry/Product)</label>
+          <input
+            name="purchase_link"
+            id="purchase_link"
+            placeholder="https://www.amazon.com/..."
+            class="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white"
+          />
+        </div>
+
+        <!-- Quantity -->
+        <div class="flex flex-col gap-2">
+          <label class="text-sm text-gray-400">Quantity</label>
+          <input
+            name="quantity"
+            id="quantity"
+            type="number"
+            min="1"
+            value="1"
+            class="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white"
+          />
+        </div>
+
+        <!-- Note -->
+        <div class="md:col-span-2 flex flex-col gap-2">
+          <label class="text-sm text-gray-400">Optional Note</label>
+          <textarea
+            name="note"
+            id="note"
+            rows="2"
+            class="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white"
+            placeholder="Add any special note or message"
+          ></textarea>
+        </div>
+
+        <!-- Categories -->
+        <div class="md:col-span-2">
+          <label class="block text-sm mb-1 text-gray-400">Select Categories</label>
+          <div class="flex flex-wrap gap-2">
+            <% const presetCategories = ['Food', 'Appliances', 'Toiletries', 'Kitchen Supplies']; %>
+            <% presetCategories.forEach(c => { %>
+              <label class="inline-flex items-center gap-2 border border-neutral-700 rounded-lg px-3 py-1 text-sm">
+                <input type="checkbox" name="category_ids" value="<%= c %>" class="accent-emerald-600" /> 
+                <%= c %>
+              </label>
+            <% }) %>
+          </div>
+        </div>
+
+        <!-- Save -->
+        <div class="md:col-span-2 mt-4">
+          <button class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded-lg">
+            Save Item
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- 📋 ITEM TABLE -->
+    <section class="bg-neutral-900 p-6 rounded-2xl shadow-lg">
+      <h2 class="text-xl font-semibold mb-4">Current Wishlist Items</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="border-b border-neutral-700 text-gray-400">
+              <th class="text-left py-2 px-3">Image</th>
+              <th class="text-left py-2 px-3">Name</th>
+              <th class="text-left py-2 px-3">Qty</th>
+              <th class="text-left py-2 px-3">Status</th>
+              <th class="text-left py-2 px-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% data.items.forEach(i => { %>
+              <tr class="border-b border-neutral-800 hover:bg-neutral-800/40">
+                <td class="py-2 px-3">
+                  <% if (i.image_url) { %>
+                    <img src="<%= i.image_url %>" alt="<%= i.name %>" class="w-16 h-16 object-cover rounded-lg" />
+                  <% } else { %>
+                    <div class="w-16 h-16 bg-neutral-700 flex items-center justify-center text-gray-400 text-xs rounded-lg">No Image</div>
+                  <% } %>
+                </td>
+                <td class="py-2 px-3 font-medium"><%= i.name %></td>
+                <td class="py-2 px-3"><%= i.quantity || 1 %></td>
+                <td class="py-2 px-3 capitalize"><%= i.status %></td>
+                <td class="py-2 px-3 space-x-2">
+                  <button
+                    class="text-blue-400 hover:text-blue-300 underline"
+                    data-item='<%- JSON.stringify(i) %>'
+                    onclick="editItemFromDataset(this)"
+                  >
+                    Edit
+                  </button>
+                  <form method="POST" action="/admin/items/<%= i.id %>?_method=DELETE" class="inline">
+                    <button class="text-red-400 hover:text-red-300 underline">Delete</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-neutral-800 py-6 text-center text-gray-500 text-sm">
+    © <%= new Date().getFullYear() %> IrieLink Registry
+  </footer>
+
+  <!-- 🧠 Admin Scripts -->
+  <script>
+    // Live image preview
+    const imageUrlInput = document.getElementById('image_url');
+    const preview = document.getElementById('image_preview');
+    imageUrlInput?.addEventListener('input', e => {
+      const url = e.target.value.trim();
+      if (url) {
+        preview.src = url;
+        preview.classList.remove('hidden');
+      } else {
+        preview.classList.add('hidden');
+      }
+    });
+
+    // Safer dataset-based edit
+    function editItemFromDataset(btn) {
+      const item = JSON.parse(btn.dataset.item);
+      editItem(item);
+    }
+
+    // Fill form when editing
+    function editItem(item) {
+      document.getElementById('form-title').textContent = 'Edit Wishlist Item';
+      document.getElementById('item-form').action = '/admin/items/' + item.id + '?_method=PUT';
+      document.getElementById('name').value = item.name || '';
+      document.getElementById('description').value = item.description || '';
+      document.getElementById('price_dollars').value = item.price_cents ? (item.price_cents / 100).toFixed(2) : '';
+      document.getElementById('image_url').value = item.image_url || '';
+      document.getElementById('purchase_link').value = item.purchase_link || '';
+      document.getElementById('quantity').value = item.quantity || 1;
+      document.getElementById('note').value = item.note || '';
+      preview.src = item.image_url || '';
+      preview.classList.toggle('hidden', !item.image_url);
+
+      // Reset and re-check categories
+      document.querySelectorAll('input[name="category_ids"]').forEach(cb => cb.checked = false);
+      if (item.categories) {
+        const selected = item.categories.split(',').map(c => c.trim());
+        document.querySelectorAll('input[name="category_ids"]').forEach(cb => {
+          if (selected.includes(cb.value)) cb.checked = true;
+        });
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  </script>
+
+  <% } %>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<%
+const totalItems = items.length;
+const purchasedItems = items.filter(i => i.status === 'purchased').length;
+const remainingItems = totalItems - purchasedItems;
+
+// Helper function to detect store/registry source
+function getSource(url) {
+  if (!url) return '';
+  const u = url.toLowerCase();
+  if (u.includes('amazon')) return 'Amazon';
+  if (u.includes('target')) return 'Target';
+  if (u.includes('rei')) return 'REI';
+  if (u.includes('etsy')) return 'Etsy';
+  if (u.includes('crateandbarrel') || u.includes('crate')) return 'Crate & Barrel';
+  if (u.includes('airbnb')) return 'Airbnb';
+  return 'External Registry';
+}
+%>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IrieLink Registry 🌿</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/custom.css" />
+</head>
+<body class="bg-black text-white min-h-screen flex flex-col font-[Inter]">
+
+  <!-- 🌿 Header / Navigation -->
+  <header class="w-full border-b border-neutral-800 px-6 py-4 flex justify-between items-center bg-black/60 backdrop-blur-md sticky top-0 z-50">
+    <h1 class="text-lg md:text-xl font-semibold tracking-wide text-white">IrieLink Registry</h1>
+    <nav class="space-x-4 text-gray-300 text-sm md:text-base">
+      <a href="/" class="text-emerald-400 hover:text-emerald-300 transition">Home</a>
+      <a href="/full-list" class="hover:text-white transition">Full List</a>
+      <a href="/contact" class="hover:text-white transition">Contact</a>
+    </nav>
+  </header>
+
+  <!-- 🌄 Hero Section -->
+  <section class="relative w-full h-[50vh] flex items-center justify-center text-center overflow-hidden">
+    <!-- background image -->
+    <div 
+      class="absolute inset-0 bg-cover bg-center opacity-40"
+      style="background-image: url('/images/JamaicaHurricaneMelissa.jpg');">
+    </div>
+
+    <!-- overlay text -->
+    <div class="relative z-10 px-6">
+      <h1 class="text-4xl md:text-5xl font-bold mb-4 tracking-tight">Welcome to IrieLink Registry - Hurricane Relief for Peterkin Family</h1>
+      <p class="max-w-2xl mx-auto text-lg text-gray-200">
+        <p class="max-w-2xl mx-auto text-lg text-gray-200 leading-relaxed">
+  Hey friends, as many of you know, Hurricane Melissa had a devastating impact on Jamaica.  
+  My family and their neighbors were severely affected, i.e., roofs torn off, homes flooded, and entire communities left trying to rebuild.  
+  This registry was created to help my family and others in their area recover by providing essential supplies and resources.  
+  Every item purchased or donation made will go directly toward relief efforts and shipments being prepared for Jamaica.  
+  Thank you so much for your love, kindness, and support during this time. Everything Irie. <3
+</p>
+      </p>
+    </div>
+  </section>
+
+  <!-- ✨ Registry Grid -->
+  <main class="flex-1 container mx-auto px-6 py-12">
+    <h2 class="text-2xl font-semibold mb-8 text-center">Quick Links</h2>
+
+    <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 auto-rows-[340px]">
+      <% items.forEach(item => { %>
+        <a 
+          href="<%= item.purchase_link || '#' %>"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="group relative block rounded-2xl overflow-hidden bg-neutral-900 hover:bg-neutral-800 transition-transform transform hover:-translate-y-1 hover:shadow-xl"
+        >
+          <!-- Item image -->
+          <% if (item.image_url) { %>
+            <img 
+              src="<%= item.image_url %>"
+              alt="<%= item.name %>"
+              class="absolute inset-0 w-full h-full object-cover opacity-35 group-hover:opacity-50 transition-opacity duration-300"
+              onerror="this.style.display='none';"
+            />
+          <% } %>
+
+          <!-- Overlay gradient and text -->
+          <div class="relative z-10 p-5 h-full flex flex-col justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+
+            <!-- top info -->
+            <div>
+              <h3 class="text-lg font-semibold mb-1"><%= item.name %></h3>
+              <% if (item.note) { %>
+                <p class="text-sm italic text-gray-400 mb-2">“<%= item.note %>”</p>
+              <% } %>
+              <p class="text-sm text-gray-300 line-clamp-3"><%= item.description %></p>
+            </div>
+
+            <!-- bottom info -->
+            <div class="space-y-2">
+              <% if (item.quantity && item.quantity > 1) { %>
+                <div class="text-xs text-gray-400">Quantity desired: <%= item.quantity %></div>
+              <% } %>
+
+              <div class="flex justify-between items-center text-sm">
+                <!-- Status badge -->
+                <% if (item.status === 'purchased') { %>
+                  <span class="px-3 py-1 rounded-full bg-emerald-700 text-emerald-100 text-xs">Purchased</span>
+                <% } else if (item.status === 'claimed') { %>
+                  <span class="px-3 py-1 rounded-full bg-amber-600 text-amber-100 text-xs">Claimed</span>
+                <% } else { %>
+                  <span class="px-3 py-1 rounded-full bg-blue-600 text-blue-100 text-xs">Available</span>
+                <% } %>
+              </div>
+
+              <!-- registry source -->
+              <% if (item.purchase_link) { %>
+                <div class="flex items-center gap-2 text-xs text-gray-400 mt-1">
+                  <% const src = getSource(item.purchase_link); %>
+                  <span><%= src %></span>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        </a>
+      <% }) %>
+    </div>
+  </main>
+
+  <footer class="border-t border-neutral-800 py-6 text-center text-gray-500 text-sm">
+    © <%= new Date().getFullYear() %> IrieLink Registry
+  </footer>
+
+</body>
+</html>

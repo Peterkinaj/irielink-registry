@@ -1,0 +1,5 @@
+<h1 class="text-2xl font-semibold mb-6">Edit Category</h1>
+<form method="POST" action="/admin/categories/<%= category.id %>" class="flex gap-2 max-w-md">
+<input name="name" value="<%= category.name %>" class="border rounded px-3 py-2 flex-1" required>
+<button class="px-4 py-2 rounded-lg bg-blue-600 text-white">Save</button>
+</form>
