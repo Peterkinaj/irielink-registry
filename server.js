@@ -1,224 +1,204 @@
-// --- server.js ---
-// Main application for IrieLink Registry
-
-import express from "express";
-import session from "express-session";
-import methodOverride from "method-override";
-import path from "path";
-import sqlite3 from "sqlite3";
-import { open } from "sqlite";
-import dotenv from "dotenv";
-
-dotenv.config();
+// 🌿 IrieLink Registry Server (with auto-migrate)
+require('dotenv').config();
+const express = require('express');
+const sqlite3 = require('sqlite3').verbose();
+const methodOverride = require('method-override');
+const session = require('express-session');
+const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const __dirname = path.resolve();
+const PORT = process.env.PORT || 10000;
 
-// --- Database connection ---
-const db = await open({
-  filename: path.join(__dirname, "registry.db"),
-  driver: sqlite3.Database,
-});
-
-// --- Helper functions ---
-async function get(sql, params = []) {
-  return db.get(sql, params);
-}
-
-async function all(sql, params = []) {
-  return db.all(sql, params);
-}
-
-async function run(sql, params = []) {
-  return db.run(sql, params);
-}
-
-// --- Middleware ---
+// --- Middleware setup ---
+app.set('view engine', 'ejs');
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(methodOverride("_method"));
-app.use(express.static(path.join(__dirname, "public")));
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
-
-// --- Session setup ---
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(methodOverride('_method'));
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "default-secret",
+    secret: process.env.SESSION_SECRET || 'irie-secret',
     resave: false,
     saveUninitialized: false,
   })
 );
 
-// --- Utility: Auth middleware ---
-function requireAdmin(req, res, next) {
-  if (req.session && req.session.isAdmin) {
-    next();
-  } else {
-    res.redirect("/admin/login");
-  }
-}
-
-// --- Home Page (Display Items) ---
-app.get("/", async (req, res) => {
-  const items = await all("SELECT * FROM items");
-  res.render("index", { items });
+// --- Database setup ---
+const db = new sqlite3.Database('registry.db', err => {
+  if (err) console.error('❌ Database connection failed:', err.message);
+  else console.log('✅ Connected to registry.db');
 });
 
+// Ensure base table exists (minimal shape)
+db.run(`
+  CREATE TABLE IF NOT EXISTS items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT
+  )
+`);
 
-/// ----- Contact Page ----
+// --- Auto-migrate: add any missing columns safely ---
+function ensureSchema() {
+  const desired = [
+    { name: 'description',   ddl: "ALTER TABLE items ADD COLUMN description TEXT" },
+    { name: 'image_url',     ddl: "ALTER TABLE items ADD COLUMN image_url TEXT" },
+    { name: 'purchase_link', ddl: "ALTER TABLE items ADD COLUMN purchase_link TEXT" },
+    { name: 'quantity',      ddl: "ALTER TABLE items ADD COLUMN quantity INTEGER DEFAULT 1" },
+    { name: 'note',          ddl: "ALTER TABLE items ADD COLUMN note TEXT" },
+    { name: 'categories',    ddl: "ALTER TABLE items ADD COLUMN categories TEXT" },
+    { name: 'status',        ddl: "ALTER TABLE items ADD COLUMN status TEXT DEFAULT 'available'" },
+  ];
 
+  db.all("PRAGMA table_info(items)", (err, rows) => {
+    if (err) {
+      console.error('❌ PRAGMA table_info failed:', err.message);
+      return;
+    }
+    const existing = new Set(rows.map(r => r.name));
+    const toAdd = desired.filter(c => !existing.has(c.name));
+
+    if (toAdd.length === 0) {
+      console.log('🧩 Schema OK: no migrations needed.');
+      return;
+    }
+
+    db.serialize(() => {
+      toAdd.forEach(col => {
+        db.run(col.ddl, e => {
+          if (e) {
+            console.error(`❌ Failed adding column ${col.name}:`, e.message);
+          } else {
+            console.log(`🛠️  Added missing column: ${col.name}`);
+          }
+        });
+      });
+    });
+  });
+}
+ensureSchema();
+
+// --- Routes ---
+
+// 🌿 Home Page
+app.get('/', (req, res) => {
+  db.all('SELECT * FROM items ORDER BY id DESC', (err, items) => {
+    if (err) return res.status(500).send('Database error');
+    res.render('index', { items });
+  });
+});
+
+// 📋 Full List Page
+app.get('/full-list', (req, res) => {
+  db.all('SELECT * FROM items ORDER BY id DESC', (err, items) => {
+    if (err) return res.status(500).send('Database error');
+    res.render('fullList', { items });
+  });
+});
+
+// ✉️ Contact Page
 app.get('/contact', (req, res) => {
   res.render('contact');
 });
 
-
-/// ----- Full List ----
-
-app.get('/full-list', (req, res) => {
-  res.render('full-list');
-});
-
-
-
-
-
-// --- Admin Login Page ---
-app.get("/admin/login", (req, res) => {
-  res.render("admin", { page: "login", error: null });
-});
-
-// --- Handle Admin Login ---
-app.post("/admin/login", (req, res) => {
-  const { password } = req.body;
-  if (password === process.env.ADMIN_PASSWORD) {
-    req.session.isAdmin = true;
-    res.redirect("/admin");
+// 🧑🏽‍💻 Admin Login Page
+app.get('/admin', (req, res) => {
+  if (req.session.loggedIn) {
+    db.all('SELECT * FROM items ORDER BY id DESC', (err, items) => {
+      if (err) return res.status(500).send('Database error');
+      res.render('admin', { page: 'dashboard', data: { items } });
+    });
   } else {
-    res.render("admin", { page: "login", error: "Invalid password." });
+    res.render('admin', { page: 'login' });
   }
 });
 
-// --- Admin Dashboard ---
-app.get("/admin", requireAdmin, async (req, res) => {
-  const items = await all("SELECT * FROM items ORDER BY id DESC");
-  res.render("admin", { page: "dashboard", data: { items } });
-});
-
-// --- Add New Item ---
-app.post("/admin/items", requireAdmin, async (req, res) => {
-  try {
-    const priceCents = req.body.price_dollars
-      ? Math.round(parseFloat(req.body.price_dollars) * 100)
-      : 0;
-
-    await run(
-      `INSERT INTO items (name, description, image_url, price_cents, purchase_link, quantity, note, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        req.body.name,
-        req.body.description,
-        req.body.image_url,
-        priceCents,
-        req.body.purchase_link,
-        req.body.quantity || 1,
-        req.body.note || "",
-        "available",
-      ]
-    );
-
-    res.redirect("/admin");
-  } catch (err) {
-    console.error("❌ Error adding item:", err);
-    res.status(500).send("Error adding item");
+// 🧠 Handle Admin Login
+app.post('/admin/login', (req, res) => {
+  const { password } = req.body;
+  const adminPass = process.env.ADMIN_PASSWORD || 'iriepass123';
+  if (password === adminPass) {
+    req.session.loggedIn = true;
+    res.redirect('/admin');
+  } else {
+    res.render('admin', { page: 'login', error: 'Invalid password' });
   }
 });
 
-// --- Update an Existing Item ---
-app.put("/admin/items/:id", requireAdmin, async (req, res) => {
-  try {
-    const id = req.params.id;
+// 🚪 Logout
+app.get('/admin/logout', (req, res) => {
+  req.session.destroy(() => res.redirect('/admin'));
+});
 
-    const item = await get("SELECT * FROM items WHERE id = ?", [id]);
-    if (!item) {
-      console.warn(`⚠️ No item found with ID ${id}`);
-      return res.redirect("/admin");
+// ➕ Add New Item
+app.post('/admin/items', (req, res) => {
+  const { name, description, image_url, purchase_link, quantity, note, category_ids } = req.body;
+
+  const categories = Array.isArray(category_ids)
+    ? category_ids.join(', ')
+    : (category_ids || '');
+
+  const sql = `
+    INSERT INTO items (name, description, image_url, purchase_link, quantity, note, categories, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'available')
+  `;
+
+  db.run(
+    sql,
+    [name, description, image_url, purchase_link, quantity || 1, note, categories],
+    err => {
+      if (err) {
+        console.error('❌ Error adding item:', err.message);
+        return res.status(500).send('Error adding item');
+      }
+      console.log(`✅ Added new item: ${name}`);
+      res.redirect('/admin');
     }
-
-    const priceCents = req.body.price_dollars
-      ? Math.round(parseFloat(req.body.price_dollars) * 100)
-      : 0;
-
-    await run(
-      `UPDATE items
-       SET name = ?, description = ?, image_url = ?, price_cents = ?, purchase_link = ?, quantity = ?, note = ?
-       WHERE id = ?`,
-      [
-        req.body.name,
-        req.body.description,
-        req.body.image_url,
-        priceCents,
-        req.body.purchase_link,
-        req.body.quantity || 1,
-        req.body.note || "",
-        id,
-      ]
-    );
-
-    console.log(`✅ Item ${id} updated successfully.`);
-    res.redirect("/admin");
-  } catch (err) {
-    console.error("❌ Error updating item:", err);
-    res.status(500).send("Error updating item");
-  }
+  );
 });
 
-// --- Delete an Item ---
-app.delete("/admin/items/:id", requireAdmin, async (req, res) => {
-  try {
-    const id = req.params.id;
-    await run("DELETE FROM items WHERE id = ?", [id]);
-    res.redirect("/admin");
-  } catch (err) {
-    console.error("❌ Error deleting item:", err);
-    res.status(500).send("Error deleting item");
-  }
-});
+// ✏️ Edit Item
+app.put('/admin/items/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, description, image_url, purchase_link, quantity, note, category_ids } = req.body;
 
-// --- Mark Item as Purchased (from public site) ---
-app.post("/items/:id/purchase", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const item = await get("SELECT * FROM items WHERE id = ?", [id]);
-    if (!item) {
-      console.warn(`⚠️ Item ${id} not found for purchase`);
-      return res.redirect("/");
+  const categories = Array.isArray(category_ids)
+    ? category_ids.join(', ')
+    : (category_ids || '');
+
+  const sql = `
+    UPDATE items
+    SET name = ?, description = ?, image_url = ?, purchase_link = ?, quantity = ?, note = ?, categories = ?
+    WHERE id = ?
+  `;
+
+  db.run(
+    sql,
+    [name, description, image_url, purchase_link, quantity || 1, note, categories, id],
+    err => {
+      if (err) {
+        console.error('❌ Error updating item:', err.message);
+        return res.status(500).send('Error updating item');
+      }
+      console.log(`✅ Updated item ID ${id}: ${name}`);
+      res.redirect('/admin');
     }
-
-    await run("UPDATE items SET status = ? WHERE id = ?", ["purchased", id]);
-    res.redirect("/");
-  } catch (err) {
-    console.error("❌ Error marking item purchased:", err);
-    res.status(500).send("Error updating item status");
-  }
+  );
 });
 
-// --- Logout Admin ---
-app.post("/admin/logout", (req, res) => {
-  req.session.destroy(() => {
-    res.redirect("/");
+// ❌ Delete Item
+app.delete('/admin/items/:id', (req, res) => {
+  const { id } = req.params;
+  db.run('DELETE FROM items WHERE id = ?', [id], err => {
+    if (err) {
+      console.error('❌ Error deleting item:', err.message);
+      return res.status(500).send('Error deleting item');
+    }
+    console.log(`🗑️ Deleted item ID ${id}`);
+    res.redirect('/admin');
   });
 });
 
-// --- Fallback 404 Page ---
-app.use((req, res) => {
-  res.status(404).render("not-found");
-});
-
-// --- Start the Server ---
+// ✅ Start Server
 app.listen(PORT, () => {
   console.log(`🌿 IrieLink running on http://localhost:${PORT}`);
 });
-
-
