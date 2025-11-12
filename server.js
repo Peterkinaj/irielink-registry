@@ -88,12 +88,11 @@ app.get('/', (req, res) => {
 });
 
 // 📋 Full List Page
+// 📋 Full List Page
 app.get('/full-list', (req, res) => {
-  db.all('SELECT * FROM items ORDER BY id DESC', (err, items) => {
-    if (err) return res.status(500).send('Database error');
-    res.render('fullList', { items });
-  });
+  res.render('fullList');
 });
+
 
 // ✉️ Contact Page
 app.get('/contact', (req, res) => {
